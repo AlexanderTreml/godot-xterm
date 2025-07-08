@@ -74,9 +74,9 @@ cd build
 args="-DCMAKE_BUILD_TYPE=$uv_target -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE \
 	-DCMAKE_OSX_ARCHITECTURES=$(uname -m)"
 if [ "$target" == "template_release" ]; then
-	args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL"
+	args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded"
 else
-	args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebugDLL"
+	args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug"
 fi
 cmake .. $args || fail
 cd ..
