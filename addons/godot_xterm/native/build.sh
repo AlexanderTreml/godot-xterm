@@ -72,7 +72,7 @@ cd ${LIBUV_DIR}
 mkdir build || true
 cd build
 args="-DCMAKE_BUILD_TYPE=$uv_target -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE \
-	-DCMAKE_OSX_ARCHITECTURES=$(uname -m)"
+	-DCMAKE_OSX_ARCHITECTURES=$(uname -m) -DCMAKE_C_FLAGS_DEBUG=\"/MTd\" -DCMAKE_C_FLAGS_RELEASE=\"/MT\" -DCMAKE_VERBOSE_MAKEFILE=ON"
 if [ "$target" == "template_release" ]; then
 	args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded"
 else
