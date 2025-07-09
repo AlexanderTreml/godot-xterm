@@ -147,6 +147,10 @@ jobs:
           else
             args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug"
           fi
+          if  [ ${{matrix.platform}} == 'windows' ]; then
+            # godot-cpp always builds with the non-debug version of the CRT. So we use /MT for both debug and release builds. 
+            args="$args -DCMAKE_C_FLAGS_DEBUG=\"/MT\" -DCMAKE_C_FLAGS_RELEASE=\"/MT\""
+          fi
           if [ "$BITS" -eq 32 -a "$PLATFORM" == "windows" ]; then
             cmake -G "Visual Studio 17 2022" -A Win32 -S $(pwd) -B "build" $args
           else

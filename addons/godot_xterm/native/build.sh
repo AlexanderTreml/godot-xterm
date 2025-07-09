@@ -72,11 +72,16 @@ cd ${LIBUV_DIR}
 mkdir build || true
 cd build
 args="-DCMAKE_BUILD_TYPE=$uv_target -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE \
-	-DCMAKE_OSX_ARCHITECTURES=$(uname -m) -DCMAKE_C_FLAGS_DEBUG=\"/MTd\" -DCMAKE_C_FLAGS_RELEASE=\"/MT\" -DCMAKE_VERBOSE_MAKEFILE=ON"
+	-DCMAKE_OSX_ARCHITECTURES=$(uname -m)"
+# TODO(ast) this seems to have no effect. only explicitly passing the /MT compiler flag makes libuv use the correct CRT
 if [ "$target" == "template_release" ]; then
 	args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded"
 else
-	args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug"
+  args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug"
+fi
+if  [ "$OSTYPE" == "cygwin" -o "$OSTYPE" == "msys" ]; then
+  # godot-cpp always builds with the non-debug version of the CRT. So we use /MT for both debug and release builds. 
+  args="$args -DCMAKE_C_FLAGS_DEBUG=\"/MT\" -DCMAKE_C_FLAGS_RELEASE=\"/MT\""
 fi
 cmake .. $args || fail
 cd ..
@@ -93,4 +98,4 @@ scons target=$target arch=$(uname -m) debug_symbols=$debug_symbols || fail
 #fi
 
 echo "Done!"
-read -p "Press any key to exit" x
+read -p "Press Enter to exit" x
