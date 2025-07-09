@@ -38,8 +38,6 @@ elif env['platform'] == 'windows':
 else:
 	env.Append(CPPDEFINES=['_PTY_DISABLED'])
 
-env.Append(LINKFLAGS=['/VERBOSE'])
-
 if env["platform"] == "macos":
     library = env.SharedLibrary(
         "bin/libgodot-xterm.{}.{}.framework/libgodot-xterm.{}.{}".format(
