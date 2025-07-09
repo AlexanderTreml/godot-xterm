@@ -81,7 +81,7 @@ else
 fi
 if  [ "$OSTYPE" == "cygwin" -o "$OSTYPE" == "msys" ]; then
   # godot-cpp always builds with the non-debug version of the CRT. So we use /MT for both debug and release builds. 
-  args="$args -DCMAKE_C_FLAGS_DEBUG=\"/MT\" -DCMAKE_C_FLAGS_RELEASE=\"/MT\""
+  args="$args -DCMAKE_C_FLAGS_DEBUG=-MT -DCMAKE_C_FLAGS_RELEASE=-MT"
 fi
 cmake .. $args || fail
 cd ..
