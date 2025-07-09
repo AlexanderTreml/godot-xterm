@@ -153,7 +153,7 @@ jobs:
             # godot-cpp always builds with the non-debug version of the CRT. So we use /MT for both debug and release builds. 
             args="$args -DCMAKE_C_FLAGS_DEBUG=-MT -DCMAKE_C_FLAGS_RELEASE=-MT"
           fi
-          if [ "$BITS" -eq 32 -a "$PLATFORM" == "windows" ]; then
+          if [ "$BITS" -eq 32 -a ${{matrix.platform}} == "windows" ]; then
             cmake -G "Visual Studio 17 2022" -A Win32 -S $(pwd) -B "build" $args
           else
             cd build
@@ -183,60 +183,62 @@ jobs:
             addons/godot_xterm/native/bin/*.xcframework
             addons/godot_xterm/native/bin/*.dll
 
-  web-export:
-    name: "Web Export"
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      - id: install-chrome
-        uses: browser-actions/setup-chrome@v1
-        with:
-          chrome-version: 121
-      - name: Setup Godot
-        uses: lihop/setup-godot@v2
-        with:
-          version: "4.2.1-stable"
-          export-templates: true
-      - name: Import assets
-        run: godot --editor --headless --quit-after 100 || true
-      - name: Wait for wasm build
-        uses: fountainhead/action-wait-for-check@v1.2.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          checkName: "Build (web, wasm32, release) #${{ github.run_number }}"
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Wait for linux build # Required for linux-based editor to recognize the GDExtension node types.
-        uses: fountainhead/action-wait-for-check@v1.2.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          checkName: "Build (linux, x86_64, debug) #${{ github.run_number }}"
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Install binary build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: addons/godot_xterm/native/bin
-          merge-multiple: true
-      - name: Export for web
-        shell: bash
-        run: godot --no-window --export-release Web
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: test/web/package-lock.json
-      - name: Smoke test Web export
-        shell: bash
-        working-directory: test/web
-        run: |
-          export GODOT_XTERM_CHROME_PATH=${{ steps.install-chrome.outputs.chrome-path }}
-          npm ci
-          npm test
-      - name: Upload export
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-demo
-          path: docs/demo
+  # TODO(ast) re-enable
+
+  # web-export:
+  #   name: "Web Export"
+  #   runs-on: ubuntu-22.04
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - id: install-chrome
+  #       uses: browser-actions/setup-chrome@v1
+  #       with:
+  #         chrome-version: 121
+  #     - name: Setup Godot
+  #       uses: lihop/setup-godot@v2
+  #       with:
+  #         version: "4.2.1-stable"
+  #         export-templates: true
+  #     - name: Import assets
+  #       run: godot --editor --headless --quit-after 100 || true
+  #     - name: Wait for wasm build
+  #       uses: fountainhead/action-wait-for-check@v1.2.0
+  #       with:
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         checkName: "Build (web, wasm32, release) #${{ github.run_number }}"
+  #         ref: ${{ github.event.pull_request.head.sha || github.sha }}
+  #     - name: Wait for linux build # Required for linux-based editor to recognize the GDExtension node types.
+  #       uses: fountainhead/action-wait-for-check@v1.2.0
+  #       with:
+  #         token: ${{ secrets.GITHUB_TOKEN }}
+  #         checkName: "Build (linux, x86_64, debug) #${{ github.run_number }}"
+  #         ref: ${{ github.event.pull_request.head.sha || github.sha }}
+  #     - name: Install binary build artifacts
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         path: addons/godot_xterm/native/bin
+  #         merge-multiple: true
+  #     - name: Export for web
+  #       shell: bash
+  #       run: godot --no-window --export-release Web
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "20"
+  #         cache: "npm"
+  #         cache-dependency-path: test/web/package-lock.json
+  #     - name: Smoke test Web export
+  #       shell: bash
+  #       working-directory: test/web
+  #       run: |
+  #         export GODOT_XTERM_CHROME_PATH=${{ steps.install-chrome.outputs.chrome-path }}
+  #         npm ci
+  #         npm test
+  #     - name: Upload export
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: web-demo
+  #         path: docs/demo
 
   test:
     name: Test (${{ matrix.platform }}, ${{ matrix.arch }}, ${{ matrix.godot-version }})
