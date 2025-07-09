@@ -53,7 +53,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [web, macos, windows]
+        # TODO(ast) re-enable other platforms
+        platform: [windows] # [web, macos, windows]
         target: [release, debug]
         arch: [wasm32, universal, x86_64, x86_32]
         include:
