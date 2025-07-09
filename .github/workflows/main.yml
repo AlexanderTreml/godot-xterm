@@ -7,46 +7,45 @@ on:
     - cron: 0 11 * * *
 
 jobs:
-  # TODO(ast) re-enable
-  # build-linux:
-  #   name: "Build (linux, ${{ matrix.arch }}, ${{ matrix.target }}) #${{ github.run_number }}"
-  #   runs-on: ubuntu-22.04
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       arch: [x86_64, x86_32]
-  #       target: [release, debug]
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         submodules: recursive
-  #     - name: Cache submodules
-  #       uses: ./.github/actions/cache-submodules
-  #       id: cache-submodules
-  #       with:
-  #         platform: linux
-  #         arch: ${{ matrix.arch }}
-  #         target: ${{ matrix.target }}
-  #     - name: Pull docker images
-  #       run: docker compose pull
-  #       working-directory: addons/godot_xterm/native
-  #     - name: Cache docker image layers
-  #       uses: jpribyl/action-docker-layer-caching@v0.1.1
-  #       continue-on-error: true
-  #     - name: Ensure scons cache exists
-  #       run: mkdir -p ${{github.workspace}}/.scons-cache
-  #     - name: Build libuv
-  #       if: steps.cache-submodules.outputs.cache-hit != 'true'
-  #       working-directory: addons/godot_xterm/native
-  #       run: UID_GID="$(id -u):$(id -g)" docker compose run -e TARGET=${{ matrix.target }} -e ARCH=${{ matrix.arch }} -v ${{github.workspace}}/.scons-cache:/scons-cache libuv-linux
-  #     - name: Build libgodot-xterm
-  #       working-directory: addons/godot_xterm/native
-  #       run: UID_GID="$(id -u):$(id -g)" docker compose run -e TARGET=${{ matrix.target }} -e ARCH=${{ matrix.arch }} -v ${{github.workspace}}/.scons-cache:/scons-cache libgodot-xterm-linux
-  #     - name: Upload binaries
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: libgodot-xterm-linux-${{ matrix.arch }}-${{ matrix.target }}
-  #         path: addons/godot_xterm/native/bin/*.so
+  build-linux:
+    name: "Build (linux, ${{ matrix.arch }}, ${{ matrix.target }}) #${{ github.run_number }}"
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, x86_32]
+        target: [release, debug]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Cache submodules
+        uses: ./.github/actions/cache-submodules
+        id: cache-submodules
+        with:
+          platform: linux
+          arch: ${{ matrix.arch }}
+          target: ${{ matrix.target }}
+      - name: Pull docker images
+        run: docker compose pull
+        working-directory: addons/godot_xterm/native
+      - name: Cache docker image layers
+        uses: jpribyl/action-docker-layer-caching@v0.1.1
+        continue-on-error: true
+      - name: Ensure scons cache exists
+        run: mkdir -p ${{github.workspace}}/.scons-cache
+      - name: Build libuv
+        if: steps.cache-submodules.outputs.cache-hit != 'true'
+        working-directory: addons/godot_xterm/native
+        run: UID_GID="$(id -u):$(id -g)" docker compose run -e TARGET=${{ matrix.target }} -e ARCH=${{ matrix.arch }} -v ${{github.workspace}}/.scons-cache:/scons-cache libuv-linux
+      - name: Build libgodot-xterm
+        working-directory: addons/godot_xterm/native
+        run: UID_GID="$(id -u):$(id -g)" docker compose run -e TARGET=${{ matrix.target }} -e ARCH=${{ matrix.arch }} -v ${{github.workspace}}/.scons-cache:/scons-cache libgodot-xterm-linux
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: libgodot-xterm-linux-${{ matrix.arch }}-${{ matrix.target }}
+          path: addons/godot_xterm/native/bin/*.so
 
   build-other-platforms:
     name: "Build (${{ matrix.platform }}, ${{ matrix.arch }}, ${{ matrix.target}}) #${{ github.run_number }}"
@@ -54,8 +53,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # TODO(ast) re-enable other platforms
-        platform: [windows] # [web, macos, windows]
+        platform: [web, macos, windows]
         target: [release, debug]
         arch: [wasm32, universal, x86_64, x86_32]
         include:
@@ -183,62 +181,60 @@ jobs:
             addons/godot_xterm/native/bin/*.xcframework
             addons/godot_xterm/native/bin/*.dll
 
-  # TODO(ast) re-enable
-
-  # web-export:
-  #   name: "Web Export"
-  #   runs-on: ubuntu-22.04
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - id: install-chrome
-  #       uses: browser-actions/setup-chrome@v1
-  #       with:
-  #         chrome-version: 121
-  #     - name: Setup Godot
-  #       uses: lihop/setup-godot@v2
-  #       with:
-  #         version: "4.2.1-stable"
-  #         export-templates: true
-  #     - name: Import assets
-  #       run: godot --editor --headless --quit-after 100 || true
-  #     - name: Wait for wasm build
-  #       uses: fountainhead/action-wait-for-check@v1.2.0
-  #       with:
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  #         checkName: "Build (web, wasm32, release) #${{ github.run_number }}"
-  #         ref: ${{ github.event.pull_request.head.sha || github.sha }}
-  #     - name: Wait for linux build # Required for linux-based editor to recognize the GDExtension node types.
-  #       uses: fountainhead/action-wait-for-check@v1.2.0
-  #       with:
-  #         token: ${{ secrets.GITHUB_TOKEN }}
-  #         checkName: "Build (linux, x86_64, debug) #${{ github.run_number }}"
-  #         ref: ${{ github.event.pull_request.head.sha || github.sha }}
-  #     - name: Install binary build artifacts
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         path: addons/godot_xterm/native/bin
-  #         merge-multiple: true
-  #     - name: Export for web
-  #       shell: bash
-  #       run: godot --no-window --export-release Web
-  #     - name: Setup Node.js
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: "20"
-  #         cache: "npm"
-  #         cache-dependency-path: test/web/package-lock.json
-  #     - name: Smoke test Web export
-  #       shell: bash
-  #       working-directory: test/web
-  #       run: |
-  #         export GODOT_XTERM_CHROME_PATH=${{ steps.install-chrome.outputs.chrome-path }}
-  #         npm ci
-  #         npm test
-  #     - name: Upload export
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: web-demo
-  #         path: docs/demo
+  web-export:
+    name: "Web Export"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - id: install-chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: 121
+      - name: Setup Godot
+        uses: lihop/setup-godot@v2
+        with:
+          version: "4.2.1-stable"
+          export-templates: true
+      - name: Import assets
+        run: godot --editor --headless --quit-after 100 || true
+      - name: Wait for wasm build
+        uses: fountainhead/action-wait-for-check@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: "Build (web, wasm32, release) #${{ github.run_number }}"
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Wait for linux build # Required for linux-based editor to recognize the GDExtension node types.
+        uses: fountainhead/action-wait-for-check@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          checkName: "Build (linux, x86_64, debug) #${{ github.run_number }}"
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install binary build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: addons/godot_xterm/native/bin
+          merge-multiple: true
+      - name: Export for web
+        shell: bash
+        run: godot --no-window --export-release Web
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: test/web/package-lock.json
+      - name: Smoke test Web export
+        shell: bash
+        working-directory: test/web
+        run: |
+          export GODOT_XTERM_CHROME_PATH=${{ steps.install-chrome.outputs.chrome-path }}
+          npm ci
+          npm test
+      - name: Upload export
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-demo
+          path: docs/demo
 
   test:
     name: Test (${{ matrix.platform }}, ${{ matrix.arch }}, ${{ matrix.godot-version }})
@@ -246,8 +242,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # TODO(ast) re-enable
-        platform: [windows] # [linux, macos, windows]
+        platform: [linux, macos, windows]
         arch: [x86_64, x86_32, universal]
         godot-version: ["v4.2-stable", "v4.2.1-stable"]
         exclude:
@@ -438,8 +433,7 @@ jobs:
   merge-artifacts:
     name: Merge Artifacts
     runs-on: ubuntu-latest
-    # TODO(ast) re-enable
-    needs: [build-other-platforms, test] # [build-linux, build-other-platforms, test, web-export]
+    needs: [build-linux, build-other-platforms, test, web-export]
     strategy:
       matrix:
         target: [release, debug]

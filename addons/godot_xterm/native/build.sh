@@ -73,7 +73,6 @@ mkdir build || true
 cd build
 args="-DCMAKE_BUILD_TYPE=$uv_target -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE \
 	-DCMAKE_OSX_ARCHITECTURES=$(uname -m)"
-# TODO(ast) this seems to have no effect. only explicitly passing the /MT compiler flag makes libuv use the correct CRT
 if [ "$target" == "template_release" ]; then
 	args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded"
 else
