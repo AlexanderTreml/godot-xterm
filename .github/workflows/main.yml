@@ -436,7 +436,8 @@ jobs:
   merge-artifacts:
     name: Merge Artifacts
     runs-on: ubuntu-latest
-    needs: [build-linux, build-other-platforms, test, web-export]
+    # TODO(ast) re-enable
+    needs: [build-other-platforms, test, web-export] # [build-linux, build-other-platforms, test, web-export]
     strategy:
       matrix:
         target: [release, debug]
