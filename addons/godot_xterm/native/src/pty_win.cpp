@@ -395,7 +395,7 @@ static void await_exit(Callable cb, int64_t pid) {
         CloseHandle(hProcess);
         cb.call_deferred(static_cast<int>(exit_code), signal_code);
     } else {
-        godot::UtilityFunctions::printerr("Could not open process!");
+        godot::UtilityFunctions::printerr("Could not open process handle! ErrorCode: ", static_cast<int64_t>(GetLastError()));
     }
 }
 

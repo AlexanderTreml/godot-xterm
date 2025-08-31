@@ -783,6 +783,11 @@ void Terminal::_handle_key_input(Ref<InputEventKey> event) {
     std::pair<Key, char32_t> key = { keycode, unicode };
     uint32_t keysym = (KEY_MAP.count(key) > 0) ? KEY_MAP.at(key) : XKB_KEY_NoSymbol;
 
+    // TODO hacky workaround for special characters in different keyboard layouts
+    if (unicode != 0 && keycode != unicode) {
+        mods = 0;
+    }
+
     last_input_event_key = event;
     tsm_vte_handle_keyboard(vte, keysym, ascii, mods, unicode ? unicode : TSM_VTE_INVALID);
 
