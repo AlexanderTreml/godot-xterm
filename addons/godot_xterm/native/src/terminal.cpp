@@ -116,6 +116,7 @@ Terminal::Terminal() {
         ERR_PRINT("Failed to create tsm vte.");
     }
     tsm_vte_set_bell_cb(vte, &Terminal::_bell_cb, this);
+    tsm_vte_set_backspace_sends_delete(vte, true);
 
     initialize_input();
     initialize_rendering();
@@ -789,7 +790,16 @@ void Terminal::_handle_key_input(Ref<InputEventKey> event) {
     }
 
     last_input_event_key = event;
-    tsm_vte_handle_keyboard(vte, keysym, ascii, mods, unicode ? unicode : TSM_VTE_INVALID);
+
+    if (keysym == XKB_KEY_NoSymbol && unicode > 0 && (mods & TSM_CONTROL_MASK) && (mods & TSM_ALT_MASK)) {
+        // If we cannot find a match in KEY_MAP (e.g. {KEY_9, ']'}) and ctrl+alt was pressed
+        // (which is used as AltGr on Windows international keyboards), then assume those
+        // modifiers were consumed to produce the unicode character (e.g. ctrl+alt+9 = ']'),
+        // and handle the event with those modifiers stripped.
+        tsm_vte_handle_keyboard(vte, XKB_KEY_NoSymbol, ascii, mods & ~(TSM_CONTROL_MASK | TSM_ALT_MASK), unicode);
+    } else {
+        tsm_vte_handle_keyboard(vte, keysym, ascii, mods, unicode ? unicode : TSM_VTE_INVALID);
+    }
 
     // Return to the bottom of the scrollback buffer if we scrolled up. Ignore
     // modifier keys pressed in isolation or if Ctrl+Shift modifier keys are
@@ -890,7 +900,7 @@ void Terminal::set_default_theme_items() {
 
     // As a workaround, create a new theme and then merge it with the default theme at the end.
     // See: https://github.com/godotengine/godot-cpp/issues/1332#issuecomment-2041060614.
-    Ref<Theme> custom_theme = new Theme();
+    Ref<Theme> custom_theme = memnew(Theme);
 
     // Default colors and font sizes from CodeEdit, TextEdit, et al.
     // A comment on the translucency of the default background color: https://github.com/godotengine/godot/pull/51159#issuecomment-891127783.

@@ -5,17 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased](https://github.com/lihop/godot-xterm/compare/v4.0.0-rc.2...HEAD)
+## [Unreleased](https://github.com/lihop/godot-xterm/compare/v4.0.0...HEAD)
 
-## [v4.0.0-rc.2](https://github.com/lihop/godot-xterm/compare/v4.0.0-rc.1...v4.0.0-rc.2) - 2025-08-18
-
-### Fixed
-
-- Text selection now works correctly when `Engine.time_scale = 0` by removing timer-based selection handling. Thanks to [@rpaciorek](https://github.com/rpaciorek).
-- Copy-on-selection now uses clipboard on non-Linux systems. Thanks to [@rpaciorek](https://github.com/rpaciorek).
-- Blinking text always starts at the beginning of the ON cycle (visible). Otherwise it would never be visible when the game is paused (`Engine.time_scale = 0`).
-
-## [v4.0.0-rc.1](https://github.com/lihop/godot-xterm/compare/v2.2.0...v4.0.0-rc.1) - 2025-08-17
+## [v4.0.0](https://github.com/lihop/godot-xterm/compare/v2.2.0...v4.0.0) - 2025-09-08
 
 ### Added
 
@@ -37,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **BREAKING**: Minimum supported Godot version is now 4.2+. Godot 3.x is no longer supported.
+- **BREAKING**: Minimum supported Godot version is now 4.3. Godot 3.x is no longer supported.
 - **BREAKING**: Terminal `cols` and `rows` properties are now read-only. Use `get_cols()` and `get_rows()` methods instead.
 - **BREAKING**: Theme color names changed to ANSI numbering system.
   Colors now use `ansi_0_color` through `ansi_15_color` instead of descriptive names.
@@ -58,7 +50,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [#125][i125] Properly ignore Ctrl modifier when used in Ctrl+Alt (AltGr) sequences for international keyboard layouts on Windows. Thanks to [@AlexanderTreml](https://github.com/AlexanderTreml) for reporting.
+- [#126][i126] Now correctly send DEL (0x7F) on backspace instead of BS (0x08) for PowerShell compatibility. Thanks to [@MattParkerDev](https://github.com/MattParkerDev) for reporting.
+- Text selection now works correctly when `Engine.time_scale = 0` by removing timer-based selection handling. Thanks to [@rpaciorek](https://github.com/rpaciorek).
+- Copy-on-selection now uses clipboard on non-Linux systems. Thanks to [@rpaciorek](https://github.com/rpaciorek).
+- Blinking text always starts at the beginning of the ON cycle (visible). Otherwise it would never be visible when the game is paused.
 - Fixed END key not working in terminal. Thanks to [@rpaciorek](https://github.com/rpaciorek).
+
+[i125]: https://github.com/lihop/godot-xterm/issues/125
+[i126]: https://github.com/lihop/godot-xterm/issues/126
 
 ## [v2.2.0](https://github.com/lihop/godot-xterm/compare/v2.1.1...v2.2.0) - 2022-08-26
 
@@ -238,7 +238,7 @@ Thanks to [@ConteZero](https://github.com/contezero) for reporting and providing
 ### Added
 
 - Changelog.
-- Asciicast importer plugin. Enables the import of .cast ([asciicast files v2](https://github.com/asciinema/asciinema/blob/master/doc/asciicast-v2.md)) that can be made using the [asciinema](https://asciinema.org/) terminal session recorder. See the [asciicast scene](/examples/asciicast) for example usage.
+- Asciicast importer plugin. Enables the import of .cast ([asciicast files v2](https://github.com/asciinema/asciinema/blob/master/doc/asciicast-v2.md)) that can be made using the [asciinema](https://asciinema.org/) terminal session recorder. See the [asciicast scene](https://github.com/lihop/godot-xterm/tree/main/examples/asciicast) for example usage.
 - Pre-built binary for x11 platform.
 
 ### Changed

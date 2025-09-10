@@ -4,11 +4,14 @@
 set dotenv-load
 
 godot := `echo "${GODOT:-godot}"`
-target := `echo "${TARGET:-template_debug}"`
+target := `echo "${TARGET:-debug}"`
+uv_build_dir := "build/" + os() + "-" + arch() 
 
-build:
-    just build-libuv
-    cd addons/godot_xterm/native && scons debug_symbols=yes
+build: build-libuv
+    #!/usr/bin/env bash
+    set -euxo pipefail
+    cd addons/godot_xterm/native
+    LIBUV_BUILD_DIR="{{uv_build_dir}}" scons target=template_{{target}} arch=$(uname -m) debug_symbols={{ if target == "release" { "no" } else { "yes" } }}
 
 build-javascript:
     UID_GID="$(id -u):$(id -g)" docker-compose -f addons/godot_xterm/native/docker-compose.yml run --rm javascript
@@ -17,18 +20,19 @@ build-libuv:
     #!/usr/bin/env bash
     set -euxo pipefail
     cd addons/godot_xterm/native/thirdparty/libuv
-    mkdir -p build
-    cd build
     args="-DCMAKE_BUILD_TYPE={{target}} -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE -DCMAKE_OSX_ARCHITECTURES=$(uname -m)"
-    if [ "{{target}}" == "template_release" ]; then \
-        args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL"; \
+    if [ "{{target}}" == "release" ]; then \
+        args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded"; \
     else \
-        args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebugDLL"; \
+        args="$args -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug"; \
     fi
-    cmake .. $args
-    cd ..
+    # On MSYS/Cygwin enforce /MT even for debug to match godot-cpp's CRT choice.
+    if [ "$OSTYPE" = "cygwin" ] || [ "$OSTYPE" = "msys" ]; then \
+        args="$args -DCMAKE_C_FLAGS_DEBUG=-MT -DCMAKE_C_FLAGS_RELEASE=-MT"; \
+    fi
+    cmake -S . -B {{uv_build_dir}} $args
     nproc=$(nproc || sysctl -n hw.ncpu)
-    cmake --build build --config {{target}} -j$nproc
+    cmake --build {{uv_build_dir}} --config {{target}} -j$nproc
 
 build-all: build build-javascript
 
@@ -80,3 +84,88 @@ clean:
         scons -C addons/godot_xterm/native -c || true; \
     fi
     rm -rf addons/godot_xterm/native/thirdparty/libuv/build
+
+
+# Build documentation (or serve with live reload if 'watch' parameter is passed)
+docs mode="build":
+    #!/usr/bin/env bash
+    set -e
+    cd docs
+    # Create and activate virtual environment if it doesn't exist
+    if [ ! -d ".venv" ]; then
+        echo "Creating Python virtual environment..."
+        python3 -m venv .venv
+    fi
+    source .venv/bin/activate
+
+    # Install dependencies based on mode
+    if [ "{{mode}}" = "serve" ]; then
+        # Check for sphinx-autobuild for serve mode
+        if ! python3 -c "import sphinx_autobuild" 2>/dev/null; then
+            echo "Installing docs dependencies..."
+            pip install -r requirements.txt
+        fi
+    else
+        # Check for sphinx for build mode
+        if ! python3 -c "import sphinx" 2>/dev/null; then
+            echo "Installing docs dependencies..."
+            pip install -r requirements.txt
+        fi
+    fi
+
+    # Generate API docs from XML
+    echo "Generating API docs from XML..."
+    echo "Auto-detecting types used in XML files..."
+
+    # Collect all candidate type names from doc/classes only (not entire godot tree)
+    ALL_TYPES=$(find ../misc/godot/doc/classes -name "*.xml" -type f -exec basename -s .xml {} \;)
+
+    # Start with essential types: @GlobalScope for substitutions, inheritance types
+    USED_TYPES="@GlobalScope CanvasItem Node Object"
+    echo "  Added required types: @GlobalScope, CanvasItem, Node, Object"
+
+    for type in $ALL_TYPES; do
+        # Case-insensitive search for the type name inside doc_classes/*.xml
+        if grep -qi "\b$type\b" ../addons/godot_xterm/native/doc_classes/*.xml; then
+            # Check if type is already in USED_TYPES to prevent duplicates
+            if ! echo "$USED_TYPES" | grep -q "\b$type\b"; then
+                USED_TYPES="$USED_TYPES $type"
+                echo "  Found type: $type"
+            fi
+        fi
+    done
+
+    # Build type files list
+    TYPE_FILES=""
+    for type in $USED_TYPES; do
+        # Find the actual path for this type
+        type_file=$(find ../misc/godot -name "$type.xml" -type f)
+        if [ -n "$type_file" ]; then
+            TYPE_FILES="$TYPE_FILES $type_file"
+        fi
+    done
+
+    # Generate API docs with core classes plus auto-detected types
+    python3 make_rst.py --verbose ../addons/godot_xterm/native/doc_classes $TYPE_FILES -o classes
+    # Clean up - remove all generated Godot class files, keep only PTY and Terminal
+    find classes -name "class_*.rst" ! -name "class_pty.rst" ! -name "class_terminal.rst" -delete
+
+    # Remove auto-generated index.rst if it was created by the script
+    if [ -f classes/index.rst ]; then rm classes/index.rst; fi
+
+    # Build or serve based on mode
+    if [ "{{mode}}" = "serve" ]; then
+        echo "Starting docs server with live reload at http://localhost:8000"
+        sphinx-autobuild . _build/html --host 0.0.0.0 --port 8000 --watch ../addons/godot_xterm/native/doc_classes
+    else
+        echo "Building documentation..."
+        sphinx-build -b html . _build/html
+    fi
+
+
+# Clean documentation build
+docs-clean:
+    #!/usr/bin/env bash
+    cd docs
+    rm -rf _build
+    echo "Documentation build directory cleaned."

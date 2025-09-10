@@ -371,3 +371,185 @@ class TestMultipleInputs:
 			assert_true(
 				terminal.has_focus(), "Terminal should still have focus after %s is pressed." % key
 			)
+
+
+class TestModifierKeys:
+	# Tests for modifier key handling, particularly Ctrl+C and keyboard layout issues.
+	# See: https://github.com/lihop/godot-xterm/issues/125
+	extends TerminalTest
+
+	func before_all():
+		# Wait a frame, otherwise the first signal emitted for some reason is \e[D (left arrow) instead of expected control char.
+		await wait_idle_frames(1)
+
+	func press_key_with_modifiers(keycode: int, unicode := 0, modifiers := []) -> void:
+		watch_signals(subject)
+		subject.grab_focus()
+		var key_event = InputEventKey.new()
+		key_event.keycode = keycode
+		key_event.unicode = unicode
+		key_event.ctrl_pressed = KEY_CTRL in modifiers
+		key_event.alt_pressed = KEY_ALT in modifiers
+		key_event.shift_pressed = KEY_SHIFT in modifiers
+		key_event.pressed = true
+		Input.call_deferred("parse_input_event", key_event)
+
+	func test_ctrl_keys_send_control_characters():
+		const test_cases = [
+			[KEY_AT, "@", 0x00, "NUL"],
+			[KEY_A, "a", 0x01, "SOH"],
+			[KEY_B, "b", 0x02, "STX"],
+			[KEY_C, "c", 0x03, "ETX"],
+			[KEY_D, "d", 0x04, "EOT"],
+			[KEY_E, "e", 0x05, "ENQ"],
+			[KEY_F, "f", 0x06, "ACK"],
+			[KEY_G, "g", 0x07, "BEL"],
+			[KEY_H, "h", 0x08, "BS"],
+			[KEY_I, "i", 0x09, "HT"],
+			[KEY_J, "j", 0x0A, "LF"],
+			[KEY_K, "k", 0x0B, "VT"],
+			[KEY_L, "l", 0x0C, "FF"],
+			[KEY_M, "m", 0x0D, "CR"],
+			[KEY_N, "n", 0x0E, "SO"],
+			[KEY_O, "o", 0x0F, "SI"],
+			[KEY_P, "p", 0x10, "DLE"],
+			[KEY_Q, "q", 0x11, "DC1"],
+			[KEY_R, "r", 0x12, "DC2"],
+			[KEY_S, "s", 0x13, "DC3"],
+			[KEY_T, "t", 0x14, "DC4"],
+			[KEY_U, "u", 0x15, "NAK"],
+			[KEY_V, "v", 0x16, "SYN"],
+			[KEY_W, "w", 0x17, "ETB"],
+			[KEY_X, "x", 0x18, "CAN"],
+			[KEY_Y, "y", 0x19, "EM"],
+			[KEY_Z, "z", 0x1A, "SUB"],
+			[KEY_BRACKETLEFT, "[", 0x1B, "ESC"],
+			[KEY_BACKSLASH, "\\", 0x1C, "FS"],
+			[KEY_BRACKETRIGHT, "]", 0x1D, "GS"],
+			[KEY_ASCIICIRCUM, "^", 0x1E, "RS"],
+			[KEY_UNDERSCORE, "_", 0x1F, "US"],
+			[KEY_QUESTION, "?", 0x7F, "DEL"],
+		]
+		for i in test_cases.size():
+			var case = test_cases[i]
+			var keycode = case[0]
+			var char = case[1]
+			var expected_control_char = case[2]
+			var description = case[3]
+			# On Windows, unicode is always 0 when Ctrl is pressed.
+			var unicode = 0 if OS.get_name() == "Windows" else char.unicode_at(0)
+			press_key_with_modifiers(keycode, unicode, [KEY_CTRL])
+			await wait_for_signal(subject.data_sent, 1)
+			var signal_params = get_signal_parameters(subject, "data_sent", i)
+			assert_eq(
+				signal_params[0],
+				PackedByteArray([expected_control_char]),
+				(
+					"Ctrl+%s should send ASCII %s (%d)"
+					% [char.to_upper(), description, expected_control_char]
+				)
+			)
+
+	func test_ascii_prioritized_over_keysym():
+		press_key_with_modifiers(KEY_YEN, "c".unicode_at(0), [KEY_CTRL])
+		await wait_for_signal(subject.data_sent, 1)
+		assert_eq(
+			get_signal_parameters(subject, "data_sent", 0)[0],
+			PackedByteArray([3]),
+			"Ctrl+C should send ETX if ascii is 'c' (even if keysym is not KEY_C)"
+		)
+
+	func test_alt_arrow_keys_prepend_escape():
+		watch_signals(subject)
+		press_key_with_modifiers(KEY_LEFT, 0, [KEY_ALT])
+		await wait_for_signal(subject.data_sent, 1)
+		assert_signal_emit_count(subject, "data_sent", 2)
+		var escape_signal = get_signal_parameters(subject, "data_sent", 0)[0]
+		var arrow_signal = get_signal_parameters(subject, "data_sent", 1)[0]
+		assert_eq(escape_signal, PackedByteArray([27]), "Should send ESC first")
+		assert_eq(arrow_signal, PackedByteArray([27, 91, 68]), "Should send arrow sequence second")
+
+	func test_ctrl_arrow_keys_send_escape_sequences():
+		press_key_with_modifiers(KEY_LEFT, 0, [KEY_CTRL])
+		await wait_for_signal(subject.data_sent, 1)
+		assert_eq(
+			get_signal_parameters(subject, "data_sent", 0)[0],
+			PackedByteArray([27, 91, 49, 59, 53, 68]),
+			"Ctrl+LeftArrow should send ESC[1;5D"
+		)
+
+	func test_shift_arrow_keys_send_escape_sequences():
+		press_key_with_modifiers(KEY_UP, 0, [KEY_SHIFT])
+		await wait_for_signal(subject.data_sent, 1)
+		assert_eq(
+			get_signal_parameters(subject, "data_sent", 0)[0],
+			PackedByteArray([27, 91, 49, 59, 50, 65]),
+			"Shift+UpArrow should send ESC[1;2A"
+		)
+
+	func test_alt_function_keys_prepend_escape():
+		watch_signals(subject)
+		press_key_with_modifiers(KEY_F1, 0, [KEY_ALT])
+		await wait_for_signal(subject.data_sent, 1)
+		assert_signal_emit_count(subject, "data_sent", 2)
+		var escape_signal = get_signal_parameters(subject, "data_sent", 0)[0]
+		var f1_signal = get_signal_parameters(subject, "data_sent", 1)[0]
+		assert_eq(escape_signal, PackedByteArray([27]), "Should send ESC first")
+		assert_eq(f1_signal, PackedByteArray([27, 79, 80]), "Should send F1 sequence second")
+
+	func test_shift_function_keys_send_alternate_sequences():
+		press_key_with_modifiers(KEY_F1, 0, [KEY_SHIFT])
+		await wait_for_signal(subject.data_sent, 1)
+		assert_eq(
+			get_signal_parameters(subject, "data_sent", 0)[0],
+			PackedByteArray([27, 91, 50, 51, 126]),
+			"Shift+F1 should send ESC[23~"
+		)
+
+	func test_ctrl_home_key():
+		press_key_with_modifiers(KEY_HOME, 0, [KEY_CTRL])
+		await wait_for_signal(subject.data_sent, 1)
+		assert_eq(
+			get_signal_parameters(subject, "data_sent", 0)[0],
+			PackedByteArray([27, 91, 49, 59, 53, 72]),
+			"Ctrl+Home should send ESC[1;5H"
+		)
+
+	func test_ctrl_end_key():
+		press_key_with_modifiers(KEY_END, 0, [KEY_CTRL])
+		await wait_for_signal(subject.data_sent, 1)
+		assert_eq(
+			get_signal_parameters(subject, "data_sent", 0)[0],
+			PackedByteArray([27, 91, 49, 59, 53, 70]),
+			"Ctrl+End should send ESC[1;5F"
+		)
+
+	func test_ctrl_alt_ignores_consumed_modifiers():
+		# Issue 125: https://github.com/lihop/godot-xterm/issues/125
+		press_key_with_modifiers(KEY_9, "]".unicode_at(0), [KEY_CTRL, KEY_ALT])
+		await wait_for_signal(subject.data_sent, 1)
+		assert_eq(
+			get_signal_parameters(subject, "data_sent", 0)[0],
+			PackedByteArray([93]),
+			"Ctrl+Alt+9 should send ']' character"
+		)
+
+	func test_altgr_alone_produces_character():
+		# Linux AltGr case: AltGr+9 sends ']' with no modifiers
+		press_key_with_modifiers(KEY_9, "]".unicode_at(0), [])
+		await wait_for_signal(subject.data_sent, 1)
+		assert_eq(
+			get_signal_parameters(subject, "data_sent", 0)[0],
+			PackedByteArray([93]),
+			"AltGr+9 should send ']' character"
+		)
+
+	func test_ctrl_altgr_adds_ctrl_escape():
+		# Linux Ctrl+AltGr case: Ctrl+AltGr+9 sends '^]'
+		press_key_with_modifiers(KEY_9, "]".unicode_at(0), [KEY_CTRL])
+		await wait_for_signal(subject.data_sent, 1)
+		assert_eq(
+			get_signal_parameters(subject, "data_sent", 0)[0],
+			PackedByteArray([0x1D]),
+			"Ctrl+AltGr+9 should send Ctrl+] (GS) control character"
+		)
