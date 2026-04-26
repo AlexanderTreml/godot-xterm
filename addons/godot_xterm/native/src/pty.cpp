@@ -102,6 +102,7 @@ PTY::PTY() {
     thread.instantiate();
     buffer_write_mutex.instantiate();
     buffer_cleared.instantiate();
+    close_mutex.instantiate();
 
     env["TERM"] = "xterm-256color";
     env["COLORTERM"] = "truecolor";
@@ -193,9 +194,7 @@ String PTY::get_pts_name() const {
 
 Error PTY::fork(const String& file, const PackedStringArray& args, const String& cwd, const int p_cols, const int p_rows) {
     // Ensure previous resources are cleaned up before forking again
-    if (status != STATUS_CLOSED) {
-        _close();
-    }
+    _close();
 
     String fork_file = _get_fork_file(file);
     Dictionary fork_env = _get_fork_env();
@@ -352,12 +351,10 @@ void PTY::_thread_func() {
 
 void PTY::_close() {
     // Prevent multiple close calls and ensure thread-safe closing
+    MutexLock lock(*close_mutex.ptr());
     if (status == STATUS_CLOSED) {
         return;
     }
-
-    // Set status immediately to prevent concurrent fork attempts
-    Status old_status = status;
     status = STATUS_CLOSED;
 
     if (use_threads) {
@@ -369,9 +366,8 @@ void PTY::_close() {
     }
 
     // Stop reading before closing pipes
-    if (old_status == STATUS_OPEN) {
-        uv_read_stop((uv_stream_t*)&pipe);
-    }
+    // Function can safely be called on an already stopped stream
+    uv_read_stop((uv_stream_t*)&pipe);
 
     if (!uv_is_closing((uv_handle_t*)&pipe)) {
         uv_close((uv_handle_t*)&pipe, _close_cb);
@@ -387,19 +383,9 @@ void PTY::_close() {
         uv_close((uv_handle_t*)&async_handle, _close_cb);
     }
 
-    // Run loop to process close callbacks
-    while (uv_loop_alive(&loop)) {
+    // Attempt to close loop. Drain loop first if busy.
+    while(uv_loop_close(&loop) == UV_EBUSY) {
         uv_run(&loop, UV_RUN_NOWAIT);
-    }
-
-    // Close and reinitialize the loop for reuse
-    int ret = uv_loop_close(&loop);
-    if (ret == UV_EBUSY) {
-        // If busy, run loop until all handles are closed
-        while (uv_loop_alive(&loop)) {
-            uv_run(&loop, UV_RUN_ONCE);
-        }
-        ret = uv_loop_close(&loop);
     }
 
     // Reinitialize loop and handles for next fork

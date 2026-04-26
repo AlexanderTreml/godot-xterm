@@ -102,6 +102,7 @@ private:
 
     Ref<Thread> thread;
     Ref<Mutex> buffer_write_mutex;
+    Ref<Mutex> close_mutex;
     Ref<Semaphore> buffer_cleared;
     PackedByteArray buffer;
     SafeFlag stop_thread;
