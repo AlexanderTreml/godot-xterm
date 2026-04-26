@@ -384,7 +384,7 @@ void PTY::_close() {
     }
 
     // Attempt to close loop. Drain loop first if busy.
-    while(uv_loop_close(&loop) == UV_EBUSY) {
+    while (uv_loop_close(&loop) == UV_EBUSY) {
         uv_run(&loop, UV_RUN_NOWAIT);
     }
 
